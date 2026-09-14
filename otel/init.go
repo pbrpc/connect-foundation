@@ -9,9 +9,9 @@ import (
 
 	"git.sonicoriginal.software/grpc-foundation/lifecycle"
 
-	"git.sonicoriginal.software/connect-foundation/otel/logging"
-	"git.sonicoriginal.software/connect-foundation/otel/metrics"
-	"git.sonicoriginal.software/connect-foundation/otel/tracing"
+	"github.com/pbrpc/connect-foundation/otel/logging"
+	"github.com/pbrpc/connect-foundation/otel/metrics"
+	"github.com/pbrpc/connect-foundation/otel/tracing"
 
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"

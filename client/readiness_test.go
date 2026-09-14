@@ -57,7 +57,7 @@ func (c *clockStub) After(d time.Duration) <-chan time.Time {
 func fixedRandom() float64 { return 0.5 }
 
 // newRequest builds a request under ctx for the stubs to see.
-func newRequest(t *testing.T, ctx context.Context) *http.Request {
+func newRequest(ctx context.Context, t *testing.T) *http.Request {
 	t.Helper()
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://service/", nil)
@@ -151,7 +151,7 @@ func TestReadyTransport(t *testing.T) {
 		clock := newClockStub()
 		transport := newReadyTransport(base, clock)
 
-		response, err := transport.RoundTrip(newRequest(t, t.Context()))
+		response, err := transport.RoundTrip(newRequest(t.Context(), t))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -170,14 +170,14 @@ func TestReadyTransport(t *testing.T) {
 		transport := newReadyTransport(base, clock)
 
 		// First attempt fails; nothing was waited for.
-		if _, err := transport.RoundTrip(newRequest(t, t.Context())); !errors.Is(err, errUnreachable) {
+		if _, err := transport.RoundTrip(newRequest(t.Context(), t)); !errors.Is(err, errUnreachable) {
 			t.Fatalf("error = %v, want %v", err, errUnreachable)
 		}
 
 		// Second attempt waits the first delay, then fails again.
 		results := make(chan error, 1)
 		go func() {
-			_, err := transport.RoundTrip(newRequest(t, t.Context()))
+			_, err := transport.RoundTrip(newRequest(t.Context(), t))
 			results <- err
 		}()
 
@@ -189,7 +189,7 @@ func TestReadyTransport(t *testing.T) {
 
 		// Third attempt waits the second, longer delay, and gets through.
 		go func() {
-			_, err := transport.RoundTrip(newRequest(t, t.Context()))
+			_, err := transport.RoundTrip(newRequest(t.Context(), t))
 			results <- err
 		}()
 
@@ -205,7 +205,7 @@ func TestReadyTransport(t *testing.T) {
 		}
 
 		// The success cleared the backoff: the next attempt does not wait.
-		if _, err := transport.RoundTrip(newRequest(t, t.Context())); err != nil {
+		if _, err := transport.RoundTrip(newRequest(t.Context(), t)); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if len(clock.waited) != len(want) {
@@ -221,7 +221,7 @@ func TestReadyTransport(t *testing.T) {
 		clock := newClockStub()
 		transport := newReadyTransport(base, clock)
 
-		if _, err := transport.RoundTrip(newRequest(t, t.Context())); !errors.Is(err, errUnreachable) {
+		if _, err := transport.RoundTrip(newRequest(t.Context(), t)); !errors.Is(err, errUnreachable) {
 			t.Fatalf("error = %v, want %v", err, errUnreachable)
 		}
 
@@ -229,7 +229,7 @@ func TestReadyTransport(t *testing.T) {
 
 		results := make(chan error, 1)
 		go func() {
-			_, err := transport.RoundTrip(newRequest(t, ctx))
+			_, err := transport.RoundTrip(newRequest(ctx, t))
 			results <- err
 		}()
 

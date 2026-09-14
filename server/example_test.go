@@ -13,8 +13,8 @@ import (
 
 	"git.sonicoriginal.software/logger"
 
-	"git.sonicoriginal.software/connect-foundation/otel"
-	"git.sonicoriginal.software/connect-foundation/server"
+	"github.com/pbrpc/connect-foundation/otel"
+	"github.com/pbrpc/connect-foundation/server"
 )
 
 const cleanupTimeout = 5 * time.Second

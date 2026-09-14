@@ -10,9 +10,9 @@ import (
 
 	"connectrpc.com/connect/v2/connecthttp"
 	"go.opentelemetry.io/otel"
-	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 
 	"git.sonicoriginal.software/grpc-testing/mocks/listener"
 )
@@ -141,7 +141,7 @@ func TestMount(t *testing.T) {
 		}
 	})
 
-	t.Run("mounts once", func(t *testing.T) {
+	t.Run("mounts once", func(_ *testing.T) {
 		srv := New(slog.New(slog.DiscardHandler))
 		srv.RPC.Register(echoMethod(nil))
 

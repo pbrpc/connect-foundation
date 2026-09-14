@@ -1,21 +1,21 @@
 # connect-foundation
 
 A Connect service needs the same things settled before it answers its first
-request: a server with connection limits and panic recovery, telemetry
-reporting under one identity, a logger that reaches request handlers carrying
-the trace they belong to, errors a caller can act on, and a shutdown that stops
-serving and then exports what it recorded.
+request: a server with connection limits and panic recovery, telemetry reporting
+under one identity, a logger that reaches request handlers carrying the trace
+they belong to, errors a caller can act on, and a shutdown that stops serving
+and then exports what it recorded.
 
 Each of those is a decision. Made once per service they drift, and two services
 in one deployment end up disagreeing about what a timeout is or what an error
 looks like. This library makes them once, for services built on
-[connect-go](https://connectrpc.com) v2. Its handlers answer gRPC, gRPC-Web,
-and Connect-protocol clients on one port.
+[connect-go](https://connectrpc.com) v2. Its handlers answer gRPC, gRPC-Web, and
+Connect-protocol clients on one port.
 
 ## Installation
 
 ```bash
-go get git.sonicoriginal.software/connect-foundation
+go get github.com/pbrpc/connect-foundation
 ```
 
 ## Usage
@@ -27,23 +27,23 @@ than from a copy here.
 
 ## What's Included
 
-- **`server/`** — `New` builds the RPC dispatcher, the mux, and the HTTP
-  server; `Serve` mounts every registered procedure and listens;
+- **`server/`** — `New` builds the RPC dispatcher, the mux, and the HTTP server;
+  `Serve` mounts every registered procedure and listens;
   `HandleGracefulShutdown` stops serving and flushes telemetry against one
   deadline. `WithRouteMiddleware` wraps individual procedure routes, which is
-  where a server bounds one stream's lifetime by setting a write deadline on
-  the response.
+  where a server bounds one stream's lifetime by setting a write deadline on the
+  response.
 - **`client/`** — `NewHTTPClient` and `New` build a `*connect.Client` with
   tracing and keepalive; `NewReadyTransport` paces requests to a peer that
   cannot be reached with the same backoff a gRPC connection used.
-- **`otel/`** — `Init` brings up logging, tracing, and metrics under one
-  service identity, exporting over OTLP/HTTP.
-- **`errors/`** — constructors for Connect errors carrying `google.rpc`
-  details, each recording a span event.
+- **`otel/`** — `Init` brings up logging, tracing, and metrics under one service
+  identity, exporting over OTLP/HTTP.
+- **`errors/`** — constructors for Connect errors carrying `google.rpc` details,
+  each recording a span event.
 
 Server configuration and keepalive settings are read through
-`grpc-foundation/config`, so a service moving from the gRPC foundation keeps
-its environment.
+`grpc-foundation/config`, so a service moving from the gRPC foundation keeps its
+environment.
 
 ## Configuration
 
@@ -52,11 +52,11 @@ its environment.
 - `GRPC_MAX_CONNECTION_IDLE` — how long a connection sits idle before it is
   closed.
 - `GRPC_KEEPALIVE_TIME`, `GRPC_KEEPALIVE_TIMEOUT` — how long a connection is
-  quiet before it is pinged, and how long the ping goes unanswered before it
-  is closed. Read by the server and the client.
+  quiet before it is pinged, and how long the ping goes unanswered before it is
+  closed. Read by the server and the client.
 - `GRPC_MAX_RECV_MSG_SIZE`, `GRPC_MAX_SEND_MSG_SIZE` — per-message limits.
-- `OTEL_TRACES_EXPORTER`, `OTEL_METRICS_EXPORTER`, `OTEL_LOGS_EXPORTER` —
-  `otlp` or `none`.
+- `OTEL_TRACES_EXPORTER`, `OTEL_METRICS_EXPORTER`, `OTEL_LOGS_EXPORTER` — `otlp`
+  or `none`.
 - `OTEL_EXPORTER_OTLP_ENDPOINT` — the collector's OTLP/HTTP receiver.
 - `LOG_FORMAT` — `structured`, `json`, `text`, or `none` for the stdout copy of
   the log.
