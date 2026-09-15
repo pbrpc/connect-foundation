@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.2.0 - 2026-09-15
+#### Features
+- add TLS termination - (2a17539) - Nathan Blair
+
+- - -
+
 ## 0.1.2 - 2026-09-15
 #### Bug Fixes
 - expose NewTransport - (9d2c92a) - Nathan Blair
