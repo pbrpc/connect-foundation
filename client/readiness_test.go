@@ -6,21 +6,34 @@ import (
 	"net/http"
 	"testing"
 	"time"
-)
 
-// roundTripperStub stands in for the transport under the ready one. It fails
-// the first failures calls with a transport error and answers the rest.
-type roundTripperStub struct {
-	failures int
-	calls    int
-}
+	"github.com/cenkalti/backoff/v7"
+)
 
 var errUnreachable = errors.New("connection refused")
 
-func (s *roundTripperStub) RoundTrip(request *http.Request) (*http.Response, error) {
-	s.calls++
+// roundTripperStub stands in for the transport under the ready one. It fails
+// requests to the hosts named in down with a transport error and answers the
+// rest, counting calls per host.
+type roundTripperStub struct {
+	down  map[string]bool
+	calls map[string]int
+}
 
-	if s.calls <= s.failures {
+func newRoundTripperStub(down ...string) *roundTripperStub {
+	s := &roundTripperStub{down: map[string]bool{}, calls: map[string]int{}}
+	for _, host := range down {
+		s.down[host] = true
+	}
+
+	return s
+}
+
+func (s *roundTripperStub) RoundTrip(request *http.Request) (*http.Response, error) {
+	host := request.URL.Host
+	s.calls[host]++
+
+	if s.down[host] {
 		return nil, errUnreachable
 	}
 
@@ -53,14 +66,34 @@ func (c *clockStub) After(d time.Duration) <-chan time.Time {
 	return c.fire
 }
 
-// fixedRandom makes the jitter deterministic: 0.5 places it at zero.
-func fixedRandom() float64 { return 0.5 }
+// scheduleStub is a BackOff answering a fixed sequence of delays, so a test
+// knows what the transport should wait. It records how many were made and
+// whether it was reset.
+type scheduleStub struct {
+	delays []time.Duration
+	calls  int
+	resets int
+}
 
-// newRequest builds a request under ctx for the stubs to see.
-func newRequest(ctx context.Context, t *testing.T) *http.Request {
+func (s *scheduleStub) NextBackOff() time.Duration {
+	delay := s.delays[min(s.calls, len(s.delays)-1)]
+	s.calls++
+
+	return delay
+}
+
+func (s *scheduleStub) Reset() { s.resets++ }
+
+// fixedSchedule makes every host follow the given delays.
+func fixedSchedule(delays ...time.Duration) NewBackOff {
+	return func() backoff.BackOff { return &scheduleStub{delays: delays} }
+}
+
+// newRequest builds a request to host under ctx for the stubs to see.
+func newRequest(t *testing.T, ctx context.Context, host string) *http.Request {
 	t.Helper()
 
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://service/", nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+host+"/", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -68,56 +101,42 @@ func newRequest(ctx context.Context, t *testing.T) *http.Request {
 	return request
 }
 
-func TestBackoffDelay(t *testing.T) {
-	backoff := Backoff{Base: time.Second, Multiplier: 2, Jitter: 0.5, Max: 10 * time.Second}
-
-	cases := []struct {
-		name    string
-		attempt int
-		random  float64
-		want    time.Duration
-	}{
-		{"first failure", 0, 0.5, time.Second},
-		{"grows by the multiplier", 2, 0.5, 4 * time.Second},
-		{"capped at max", 10, 0.5, 10 * time.Second},
-		{"jitter below", 0, 0, 500 * time.Millisecond},
-		{"jitter above", 0, 1, 1500 * time.Millisecond},
-	}
-
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			if got := backoff.Delay(c.attempt, c.random); got != c.want {
-				t.Errorf("delay = %v, want %v", got, c.want)
-			}
-		})
-	}
-}
-
 func TestNewReadyTransport(t *testing.T) {
-	t.Run("substitutes the system clock and default backoff", func(t *testing.T) {
-		transport, ok := NewReadyTransport(&roundTripperStub{}, nil, Backoff{}).(*readyTransport)
+	t.Run("substitutes the standard transport, system clock, and exponential schedule", func(t *testing.T) {
+		transport, ok := NewReadyTransport(nil, nil, nil).(*readyTransport)
 		if !ok {
 			t.Fatal("expected a readyTransport")
+		}
+
+		base, ok := transport.base.(*http.Transport)
+		if !ok {
+			t.Fatalf("base = %T, want the standard transport", transport.base)
+		}
+		if !base.Protocols.UnencryptedHTTP2() {
+			t.Errorf("protocols = %v, want cleartext HTTP/2", base.Protocols)
 		}
 		if _, ok := transport.clock.(systemClock); !ok {
 			t.Errorf("clock = %T, want the system clock", transport.clock)
 		}
-		if transport.backoff != DefaultBackoff {
-			t.Errorf("backoff = %v, want the default", transport.backoff)
+		if _, ok := transport.newBackOff().(*backoff.ExponentialBackOff); !ok {
+			t.Error("expected the library's exponential schedule")
 		}
 	})
 
 	t.Run("keeps what it is given", func(t *testing.T) {
+		base := newRoundTripperStub()
 		clock := newClockStub()
-		backoff := Backoff{Base: time.Millisecond, Multiplier: 1, Jitter: 0, Max: time.Millisecond}
 
-		transport := NewReadyTransport(&roundTripperStub{}, clock, backoff).(*readyTransport)
+		transport := NewReadyTransport(base, clock, fixedSchedule(time.Second)).(*readyTransport)
 
+		if transport.base != base {
+			t.Error("expected the base transport it was given")
+		}
 		if transport.clock != clock {
 			t.Error("expected the clock it was given")
 		}
-		if transport.backoff != backoff {
-			t.Errorf("backoff = %v, want %v", transport.backoff, backoff)
+		if _, ok := transport.newBackOff().(*scheduleStub); !ok {
+			t.Error("expected the schedule it was given")
 		}
 	})
 }
@@ -136,26 +155,34 @@ func TestSystemClock(t *testing.T) {
 	}
 }
 
-// newReadyTransport builds a ready transport over base with the stub clock and
-// a deterministic jitter.
-func newReadyTransport(base http.RoundTripper, clock *clockStub) *readyTransport {
-	transport := NewReadyTransport(base, clock, DefaultBackoff).(*readyTransport)
-	transport.random = fixedRandom
+// attempt sends a request to host on its own goroutine and answers with the
+// channel its error arrives on.
+func attempt(t *testing.T, ctx context.Context, transport http.RoundTripper, host string) <-chan error {
+	t.Helper()
 
-	return transport
+	results := make(chan error, 1)
+
+	go func() {
+		_, err := transport.RoundTrip(newRequest(t, ctx, host))
+		results <- err
+	}()
+
+	return results
 }
 
 func TestReadyTransport(t *testing.T) {
-	t.Run("sends at once while the peer is reachable", func(t *testing.T) {
-		base := &roundTripperStub{}
-		clock := newClockStub()
-		transport := newReadyTransport(base, clock)
+	const grpcd, principal = "grpcd:50051", "principal:50051"
 
-		response, err := transport.RoundTrip(newRequest(t.Context(), t))
+	t.Run("sends at once while the host is reachable", func(t *testing.T) {
+		base := newRoundTripperStub()
+		clock := newClockStub()
+		transport := NewReadyTransport(base, clock, fixedSchedule(time.Second))
+
+		response, err := transport.RoundTrip(newRequest(t, t.Context(), grpcd))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		// A response with any status is the peer answering.
+		// A response with any status is the host answering.
 		if response.StatusCode != http.StatusServiceUnavailable {
 			t.Errorf("status = %d, want the base transport's answer passed through", response.StatusCode)
 		}
@@ -164,74 +191,98 @@ func TestReadyTransport(t *testing.T) {
 		}
 	})
 
-	t.Run("waits out the backoff after a failure and resets on success", func(t *testing.T) {
-		base := &roundTripperStub{failures: 2}
+	t.Run("waits out the schedule after a failure and forgets the host on success", func(t *testing.T) {
+		base := newRoundTripperStub(grpcd)
 		clock := newClockStub()
-		transport := newReadyTransport(base, clock)
+		transport := NewReadyTransport(base, clock, fixedSchedule(time.Second, 2*time.Second))
 
 		// First attempt fails; nothing was waited for.
-		if _, err := transport.RoundTrip(newRequest(t.Context(), t)); !errors.Is(err, errUnreachable) {
+		if _, err := transport.RoundTrip(newRequest(t, t.Context(), grpcd)); !errors.Is(err, errUnreachable) {
 			t.Fatalf("error = %v, want %v", err, errUnreachable)
 		}
 
 		// Second attempt waits the first delay, then fails again.
-		results := make(chan error, 1)
-		go func() {
-			_, err := transport.RoundTrip(newRequest(t.Context(), t))
-			results <- err
-		}()
-
+		results := attempt(t, t.Context(), transport, grpcd)
 		clock.fire <- clock.now
 
 		if err := <-results; !errors.Is(err, errUnreachable) {
 			t.Fatalf("error = %v, want %v", err, errUnreachable)
 		}
 
-		// Third attempt waits the second, longer delay, and gets through.
-		go func() {
-			_, err := transport.RoundTrip(newRequest(t.Context(), t))
-			results <- err
-		}()
+		// The host comes back. The third attempt waits the second delay and
+		// gets through.
+		delete(base.down, grpcd)
 
+		results = attempt(t, t.Context(), transport, grpcd)
 		clock.fire <- clock.now
 
 		if err := <-results; err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 
-		want := []time.Duration{DefaultBackoff.Delay(0, 0.5), DefaultBackoff.Delay(1, 0.5)}
+		want := []time.Duration{time.Second, 2 * time.Second}
 		if len(clock.waited) != len(want) || clock.waited[0] != want[0] || clock.waited[1] != want[1] {
 			t.Errorf("waited %v, want %v", clock.waited, want)
 		}
 
-		// The success cleared the backoff: the next attempt does not wait.
-		if _, err := transport.RoundTrip(newRequest(t.Context(), t)); err != nil {
+		// The success forgot the host: the next attempt does not wait.
+		if _, err := transport.RoundTrip(newRequest(t, t.Context(), grpcd)); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if len(clock.waited) != len(want) {
 			t.Errorf("waited %v, want no further wait", clock.waited)
 		}
-		if base.calls != 4 {
-			t.Errorf("base transport calls = %d, want 4", base.calls)
+		if base.calls[grpcd] != 4 {
+			t.Errorf("base transport calls = %d, want 4", base.calls[grpcd])
+		}
+	})
+
+	t.Run("keeps hosts apart", func(t *testing.T) {
+		base := newRoundTripperStub(grpcd)
+		clock := newClockStub()
+		transport := NewReadyTransport(base, clock, fixedSchedule(time.Second))
+
+		if _, err := transport.RoundTrip(newRequest(t, t.Context(), grpcd)); !errors.Is(err, errUnreachable) {
+			t.Fatalf("error = %v, want %v", err, errUnreachable)
+		}
+
+		// grpcd is in backoff; principal is not held by it.
+		if _, err := transport.RoundTrip(newRequest(t, t.Context(), principal)); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if len(clock.waited) != 0 {
+			t.Errorf("waited %v, want no wait for another host", clock.waited)
+		}
+	})
+
+	t.Run("attempts at once when the schedule stops", func(t *testing.T) {
+		base := newRoundTripperStub(grpcd)
+		clock := newClockStub()
+		transport := NewReadyTransport(base, clock, fixedSchedule(backoff.Stop))
+
+		if _, err := transport.RoundTrip(newRequest(t, t.Context(), grpcd)); !errors.Is(err, errUnreachable) {
+			t.Fatalf("error = %v, want %v", err, errUnreachable)
+		}
+		if _, err := transport.RoundTrip(newRequest(t, t.Context(), grpcd)); !errors.Is(err, errUnreachable) {
+			t.Fatalf("error = %v, want %v", err, errUnreachable)
+		}
+		if len(clock.waited) != 0 {
+			t.Errorf("waited %v, want no wait after Stop", clock.waited)
 		}
 	})
 
 	t.Run("gives up the wait when the request's context ends", func(t *testing.T) {
-		base := &roundTripperStub{failures: 1}
+		base := newRoundTripperStub(grpcd)
 		clock := newClockStub()
-		transport := newReadyTransport(base, clock)
+		transport := NewReadyTransport(base, clock, fixedSchedule(time.Second))
 
-		if _, err := transport.RoundTrip(newRequest(t.Context(), t)); !errors.Is(err, errUnreachable) {
+		if _, err := transport.RoundTrip(newRequest(t, t.Context(), grpcd)); !errors.Is(err, errUnreachable) {
 			t.Fatalf("error = %v, want %v", err, errUnreachable)
 		}
 
 		ctx, cancel := context.WithCancel(t.Context())
 
-		results := make(chan error, 1)
-		go func() {
-			_, err := transport.RoundTrip(newRequest(ctx, t))
-			results <- err
-		}()
+		results := attempt(t, ctx, transport, grpcd)
 
 		// The wait is in progress once the clock has been asked; cancelling
 		// then is what ends it.
@@ -246,8 +297,8 @@ func TestReadyTransport(t *testing.T) {
 		if err := <-results; !errors.Is(err, context.Canceled) {
 			t.Fatalf("error = %v, want %v", err, context.Canceled)
 		}
-		if base.calls != 1 {
-			t.Errorf("base transport calls = %d, want the cancelled request not sent", base.calls)
+		if base.calls[grpcd] != 1 {
+			t.Errorf("base transport calls = %d, want the cancelled request not sent", base.calls[grpcd])
 		}
 	})
 }

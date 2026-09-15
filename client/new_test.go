@@ -79,7 +79,7 @@ func TestNewHTTPClient(t *testing.T) {
 	})
 
 	t.Run("traces over the caller's transport", func(t *testing.T) {
-		base := &roundTripperStub{}
+		base := newRoundTripperStub()
 
 		httpClient := NewHTTPClient(base)
 
@@ -97,8 +97,8 @@ func TestNewHTTPClient(t *testing.T) {
 		if _, err := httpClient.Transport.RoundTrip(request); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if base.calls != 1 {
-			t.Errorf("base transport calls = %d, want 1", base.calls)
+		if base.calls["service"] != 1 {
+			t.Errorf("base transport calls = %d, want 1", base.calls["service"])
 		}
 	})
 }

@@ -1,11 +1,11 @@
 package client
 
 import (
-	"math"
-	"math/rand/v2"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/cenkalti/backoff/v7"
 )
 
 // Clock is what the ready transport needs of time: the current instant, and a
@@ -21,96 +21,89 @@ type systemClock struct{}
 func (systemClock) Now() time.Time                         { return time.Now() }
 func (systemClock) After(d time.Duration) <-chan time.Time { return time.After(d) }
 
-// Backoff is how long a peer that could not be reached is left alone before
-// the next attempt, growing with each failure in a row.
-type Backoff struct {
-	// Base is the delay after the first failure.
-	Base time.Duration
-	// Multiplier grows the delay on each further failure.
-	Multiplier float64
-	// Jitter is the fraction of the delay that is randomized either way, so
-	// clients that failed together do not retry together.
-	Jitter float64
-	// Max caps the delay before jitter.
-	Max time.Duration
+// NewBackOff makes the schedule one host's attempts follow while it cannot be
+// reached. Each host gets its own, made when its first attempt fails.
+type NewBackOff func() backoff.BackOff
+
+// hostState is a host that could not be reached: the schedule its attempts
+// follow, and when the next one may go.
+type hostState struct {
+	backoff backoff.BackOff
+	next    time.Time
 }
 
-// DefaultBackoff is grpc-go's connection backoff, so a client that moved from
-// a gRPC connection waits out an outage the way it did before.
-var DefaultBackoff = Backoff{
-	Base:       time.Second,
-	Multiplier: 1.6,
-	Jitter:     0.2,
-	Max:        2 * time.Minute,
-}
-
-// Delay answers with how long to wait after the attempt-th failure in a row,
-// counting from zero. random is a draw in [0, 1) that places the jitter.
-func (b Backoff) Delay(attempt int, random float64) time.Duration {
-	delay := float64(b.Base) * math.Pow(b.Multiplier, float64(attempt))
-	delay = math.Min(delay, float64(b.Max))
-	delay *= 1 + b.Jitter*(2*random-1)
-
-	return time.Duration(delay)
-}
-
-// readyTransport paces requests to a peer that cannot be reached. A gRPC
+// readyTransport paces requests to hosts that cannot be reached. A gRPC
 // connection did this on its own: an RPC opened with WaitForReady blocked
 // until the connection's reconnect backoff got through. An HTTP transport
 // tries a dial on every request, so the loops that reopen a stream after it
-// drops would spin against a peer that is down. This puts the same backoff
-// under them: after a failure to reach the peer, every request waits until
-// the backoff has elapsed before trying again, and a request that got through
-// resets it.
+// drops would spin against a peer that is down. This gates them: after a
+// failure to reach a host, every request to that host waits until its
+// schedule allows the next attempt, and a request that gets through clears it.
+//
+// A request is held before it is sent and never sent twice, so a streaming
+// request body is as safe here as a unary one. Hosts are kept apart: one being
+// down holds nothing bound for another.
 type readyTransport struct {
-	base    http.RoundTripper
-	clock   Clock
-	backoff Backoff
-	random  func() float64
+	base       http.RoundTripper
+	clock      Clock
+	newBackOff NewBackOff
 
-	mu      sync.Mutex
-	next    time.Time
-	attempt int
+	// mu guards hosts. Requests arrive on their own goroutines, and a BackOff
+	// is not safe for concurrent use.
+	mu    sync.Mutex
+	hosts map[string]*hostState
 }
 
 // NewReadyTransport wraps base with the pacing described on readyTransport.
-// clock nil means the system clock; a zero backoff means DefaultBackoff.
-func NewReadyTransport(base http.RoundTripper, clock Clock, backoff Backoff) http.RoundTripper {
+// base nil means the standard transport, the one NewHTTPClient uses on its
+// own; clock nil means the system clock; newBackOff nil means the backoff
+// library's exponential schedule with its defaults.
+func NewReadyTransport(base http.RoundTripper, clock Clock, newBackOff NewBackOff) http.RoundTripper {
+	if base == nil {
+		base = newTransport()
+	}
+
 	if clock == nil {
 		clock = systemClock{}
 	}
 
-	if backoff == (Backoff{}) {
-		backoff = DefaultBackoff
+	if newBackOff == nil {
+		newBackOff = func() backoff.BackOff { return backoff.NewExponentialBackOff() }
 	}
 
 	return &readyTransport{
-		base:    base,
-		clock:   clock,
-		backoff: backoff,
-		random:  rand.Float64,
+		base:       base,
+		clock:      clock,
+		newBackOff: newBackOff,
+		hosts:      map[string]*hostState{},
 	}
 }
 
-// RoundTrip waits out the backoff, if one is running, then sends the request.
-// A request the peer answered, with whatever status, proves it reachable and
-// clears the backoff; one that produced no response starts or extends it.
+// RoundTrip waits until the host may be attempted, then sends the request. A
+// response, with whatever status, proves the host reachable and clears its
+// state; no response starts or extends its schedule.
 func (t *readyTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	if err := t.wait(req); err != nil {
+	host := req.URL.Host
+
+	if err := t.wait(req, host); err != nil {
 		return nil, err
 	}
 
 	response, err := t.base.RoundTrip(req)
 
-	t.record(err == nil)
+	t.record(host, err == nil)
 
 	return response, err
 }
 
-// wait blocks until the backoff has elapsed or the request's context ends.
-func (t *readyTransport) wait(req *http.Request) error {
+// wait blocks until host's next attempt may go or the request's context ends.
+// A host with no state may be attempted at once.
+func (t *readyTransport) wait(req *http.Request, host string) error {
 	t.mu.Lock()
-	next := t.next
+	var next time.Time
+	if state, found := t.hosts[host]; found {
+		next = state.next
+	}
 	t.mu.Unlock()
 
 	delay := next.Sub(t.clock.Now())
@@ -126,19 +119,32 @@ func (t *readyTransport) wait(req *http.Request) error {
 	}
 }
 
-// record notes whether the peer was reached, and schedules the next attempt
-// when it was not.
-func (t *readyTransport) record(reached bool) {
+// record notes whether host was reached. Reached forgets the host; not reached
+// schedules its next attempt, starting its schedule if this was the first
+// failure. A schedule that answers Stop has nothing more to wait for, so the
+// next attempt is immediate.
+func (t *readyTransport) record(host string, reached bool) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
 	if reached {
-		t.next = time.Time{}
-		t.attempt = 0
+		delete(t.hosts, host)
 
 		return
 	}
 
-	t.next = t.clock.Now().Add(t.backoff.Delay(t.attempt, t.random()))
-	t.attempt++
+	state, found := t.hosts[host]
+	if !found {
+		state = &hostState{backoff: t.newBackOff()}
+		t.hosts[host] = state
+	}
+
+	delay := state.backoff.NextBackOff()
+	if delay == backoff.Stop {
+		state.next = time.Time{}
+
+		return
+	}
+
+	state.next = t.clock.Now().Add(delay)
 }
