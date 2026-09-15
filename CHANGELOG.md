@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.1.2 - 2026-09-15
+#### Bug Fixes
+- expose NewTransport - (9d2c92a) - Nathan Blair
+#### Tests
+- remove names that should not be there - (eab1789) - Nathan Blair
+
+- - -
+
 ## 0.1.1 - 2026-09-15
 #### Bug Fixes
 - default transport when none is passed in for the client - (fd9a8ff) - Nathan Blair
