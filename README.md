@@ -32,7 +32,10 @@ than from a copy here.
   `HandleGracefulShutdown` stops serving and flushes telemetry against one
   deadline. `WithRouteMiddleware` wraps individual procedure routes, which is
   where a server bounds one stream's lifetime by setting a write deadline on the
-  response.
+  response. `WithTLS` terminates TLS on the listener with the `*tls.Config`
+  given, serving HTTP/1.1 and HTTP/2 over it; `TLSConfig` builds that config
+  from the environment, and answers nil, which `WithTLS` reads as cleartext,
+  when none is set.
 - **`client/`** — `NewHTTPClient` and `New` build a `*connect.Client` with
   tracing and keepalive; `NewReadyTransport` holds requests to a host that
   could not be reached until its backoff schedule allows the next attempt,
@@ -56,6 +59,9 @@ environment.
   quiet before it is pinged, and how long the ping goes unanswered before it is
   closed. Read by the server and the client.
 - `GRPC_MAX_RECV_MSG_SIZE`, `GRPC_MAX_SEND_MSG_SIZE` — per-message limits.
+- `TLS_CERT`, `TLS_KEY` — the listener's certificate and key as PEM, read by
+  `server.TLSConfig`. Both unset is a cleartext listener. `TLS_CLIENT_CA` — a
+  PEM CA; when set, every client must present a certificate it signed.
 - `OTEL_TRACES_EXPORTER`, `OTEL_METRICS_EXPORTER`, `OTEL_LOGS_EXPORTER` — `otlp`
   or `none`.
 - `OTEL_EXPORTER_OTLP_ENDPOINT` — the collector's OTLP/HTTP receiver.

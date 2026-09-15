@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"log/slog"
 	"testing"
 	"time"
@@ -24,6 +25,22 @@ func TestNew(t *testing.T) {
 		}
 		if !srv.HTTP.Protocols.HTTP1() || !srv.HTTP.Protocols.UnencryptedHTTP2() {
 			t.Errorf("protocols = %v, want HTTP/1.1 and cleartext HTTP/2", srv.HTTP.Protocols)
+		}
+	})
+
+	t.Run("terminates TLS when configured", func(t *testing.T) {
+		cfg := &tls.Config{}
+
+		srv := New(slog.New(slog.DiscardHandler), WithTLS(cfg))
+
+		if srv.HTTP.TLSConfig != cfg {
+			t.Error("the HTTP server does not carry the TLS config")
+		}
+		if !srv.HTTP.Protocols.HTTP1() || !srv.HTTP.Protocols.HTTP2() {
+			t.Errorf("protocols = %v, want HTTP/1.1 and HTTP/2 over TLS", srv.HTTP.Protocols)
+		}
+		if srv.HTTP.Protocols.UnencryptedHTTP2() {
+			t.Errorf("protocols = %v, want no cleartext HTTP/2 on a TLS listener", srv.HTTP.Protocols)
 		}
 	})
 

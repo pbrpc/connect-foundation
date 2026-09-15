@@ -37,10 +37,16 @@ func (s *Server) Mount() {
 	})
 }
 
-// Serve mounts the procedures and serves on lis. It blocks the way
-// http.Server.Serve does, and answers with what that answers with.
+// Serve mounts the procedures and serves on lis, terminating TLS there when
+// the server was built WithTLS. It blocks the way http.Server.Serve does, and
+// answers with what that answers with.
 func (s *Server) Serve(lis net.Listener) error {
 	s.Mount()
+
+	if s.HTTP.TLSConfig != nil {
+		// The certificate is in the config, so there are no files to name.
+		return s.HTTP.ServeTLS(lis, "", "")
+	}
 
 	return s.HTTP.Serve(lis)
 }

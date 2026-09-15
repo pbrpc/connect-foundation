@@ -57,6 +57,17 @@ func Example() {
 
 	serverName := server.Name("example")
 
+	// TLS material comes from the environment when the listener terminates
+	// TLS; with none set the listener is cleartext and WithTLS is a no-op.
+	// Read before telemetry is up, so a failure is reported the way the
+	// telemetry's own would be.
+	tlsConfig, err := server.TLSConfig()
+	if err != nil {
+		slog.Default().Error("Failed to read TLS configuration", slog.Any("error", err))
+		exitCode = 1
+		return
+	}
+
 	log, flush, err := otel.Init(ctx, serverName, server.Version())
 	if err != nil {
 		slog.Default().Error("Failed to initialize telemetry", slog.Any("error", err))
@@ -68,7 +79,7 @@ func Example() {
 
 	// New installs an interceptor that puts this logger into every request
 	// context, so it has to be built after the logger is complete.
-	srv := server.New(log)
+	srv := server.New(log, server.WithTLS(tlsConfig))
 
 	// Deferred before anything else can fail, so every path out of here stops
 	// the server and exports what it logged on the way.

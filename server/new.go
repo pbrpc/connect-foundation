@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/tls"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -22,6 +23,7 @@ type options struct {
 	interceptors []connect.ServerInterceptor
 	transport    []connecthttp.Option
 	middleware   []Middleware
+	tls          *tls.Config
 }
 
 // Option customizes New.
@@ -54,6 +56,16 @@ func WithRouteMiddleware(middleware ...Middleware) Option {
 	}
 }
 
+// WithTLS terminates TLS on the listener with cfg, which supplies the
+// certificate and whatever client authentication the caller wants. The server
+// then accepts HTTP/1.1 and HTTP/2 over TLS, and Serve serves TLS. Without it
+// the listener is cleartext.
+func WithTLS(cfg *tls.Config) Option {
+	return func(o *options) {
+		o.tls = cfg
+	}
+}
+
 // Server is the three things a Connect service serves through: the RPC
 // dispatcher its handlers register on, the mux its HTTP routes go on, and the
 // HTTP server that listens. Mount joins the first two; Serve does that and
@@ -80,9 +92,10 @@ type Server struct {
 // span the HTTP layer started, panic recovery answering Internal, and the
 // logger in every request context. Message-size limits come from
 // GRPC_MAX_RECV_MSG_SIZE and GRPC_MAX_SEND_MSG_SIZE. The HTTP server accepts
-// HTTP/1.1 and cleartext HTTP/2, closes a connection idle for
-// GRPC_MAX_CONNECTION_IDLE, and pings one quiet for GRPC_KEEPALIVE_TIME, closing
-// it when the ping goes unanswered for GRPC_KEEPALIVE_TIMEOUT.
+// HTTP/1.1 and cleartext HTTP/2, or HTTP/1.1 and HTTP/2 over TLS when WithTLS
+// is given; it closes a connection idle for GRPC_MAX_CONNECTION_IDLE, and
+// pings one quiet for GRPC_KEEPALIVE_TIME, closing it when the ping goes
+// unanswered for GRPC_KEEPALIVE_TIMEOUT.
 func New(log *slog.Logger, opts ...Option) *Server {
 	if log == nil {
 		log = logger.NewNullLogger()
@@ -106,7 +119,11 @@ func New(log *slog.Logger, opts ...Option) *Server {
 
 	protocols := new(http.Protocols)
 	protocols.SetHTTP1(true)
-	protocols.SetUnencryptedHTTP2(true)
+	if o.tls != nil {
+		protocols.SetHTTP2(true)
+	} else {
+		protocols.SetUnencryptedHTTP2(true)
+	}
 
 	mux := http.NewServeMux()
 
@@ -117,6 +134,7 @@ func New(log *slog.Logger, opts ...Option) *Server {
 			Handler:     mux,
 			IdleTimeout: config.DurationOrDefault(EnvMaxConnectionIdle, DefaultMaxConnectionIdle),
 			Protocols:   protocols,
+			TLSConfig:   o.tls,
 			HTTP2: &http.HTTP2Config{
 				SendPingTimeout: config.KeepAliveTime(),
 				PingTimeout:     config.KeepAliveTimeout(),

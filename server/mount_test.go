@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/tls"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -152,18 +153,10 @@ func TestMount(t *testing.T) {
 	})
 }
 
-func TestServe(t *testing.T) {
-	srv := New(slog.New(slog.DiscardHandler))
-	srv.RPC.Register(echoMethod(nil))
-
-	lis := listener.New()
-
-	served := make(chan error, 1)
-	go func() { served <- srv.Serve(lis) }()
-
-	// Closing the listener is what ends Serve: Accept answers with the closed
-	// error and Serve hands it back.
-	_ = lis.Close()
+// awaitServed waits for Serve to return after its listener was closed, and
+// fails the test if it does not or reports nothing.
+func awaitServed(t *testing.T, served <-chan error) {
+	t.Helper()
 
 	select {
 	case err := <-served:
@@ -173,9 +166,56 @@ func TestServe(t *testing.T) {
 	case <-t.Context().Done():
 		t.Fatal("Serve did not return after the listener closed")
 	}
+}
 
-	// Serve mounted before listening.
-	if recorder := echo(srv, "hello"); recorder.Code != http.StatusOK {
-		t.Fatalf("status = %d, want the procedure mounted", recorder.Code)
-	}
+func TestServe(t *testing.T) {
+	t.Run("serves cleartext", func(t *testing.T) {
+		srv := New(slog.New(slog.DiscardHandler))
+		srv.RPC.Register(echoMethod(nil))
+
+		lis := listener.New()
+
+		served := make(chan error, 1)
+		go func() { served <- srv.Serve(lis) }()
+
+		// Closing the listener is what ends Serve: Accept answers with the
+		// closed error and Serve hands it back.
+		_ = lis.Close()
+
+		awaitServed(t, served)
+
+		// Serve mounted before listening.
+		if recorder := echo(srv, "hello"); recorder.Code != http.StatusOK {
+			t.Fatalf("status = %d, want the procedure mounted", recorder.Code)
+		}
+	})
+
+	t.Run("terminates TLS on the listener when configured", func(t *testing.T) {
+		srv := New(slog.New(slog.DiscardHandler), WithTLS(&tls.Config{
+			Certificates: []tls.Certificate{selfSigned(t)},
+		}))
+		srv.RPC.Register(echoMethod(nil))
+
+		lis, client := newPipeListener()
+
+		served := make(chan error, 1)
+		go func() { served <- srv.Serve(lis) }()
+
+		// The handshake completes only against a TLS listener; a cleartext
+		// one would read the ClientHello as an HTTP request and answer in
+		// plain text, which the client cannot parse as a ServerHello.
+		conn := tls.Client(client, &tls.Config{InsecureSkipVerify: true, NextProtos: []string{"h2"}}) //nolint:gosec // a self-signed test certificate
+
+		if err := conn.HandshakeContext(t.Context()); err != nil {
+			t.Fatalf("handshake failed: %v", err)
+		}
+		if got := conn.ConnectionState().NegotiatedProtocol; got != "h2" {
+			t.Errorf("negotiated %q, want HTTP/2 over TLS", got)
+		}
+
+		_ = conn.Close()
+		_ = lis.Close()
+
+		awaitServed(t, served)
+	})
 }
