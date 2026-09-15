@@ -18,11 +18,13 @@ func BaseURL(address string) string {
 	return "http://" + address
 }
 
-// newTransport is the standard HTTP transport: cleartext HTTP/2 to the
+// NewTransport is the standard HTTP transport: cleartext HTTP/2 to the
 // internal mesh, with keepalive pings read from GRPC_KEEPALIVE_TIME and
 // GRPC_KEEPALIVE_TIMEOUT, sent whether or not an RPC is active so a peer that
 // went silent is noticed on a held connection and not only on the next call.
-func newTransport() *http.Transport {
+// It is what NewHTTPClient and NewReadyTransport use when given no base, and
+// what a caller wraps when it puts its own RoundTripper under them.
+func NewTransport() *http.Transport {
 	protocols := new(http.Protocols)
 	protocols.SetHTTP1(true)
 	protocols.SetUnencryptedHTTP2(true)
@@ -42,7 +44,7 @@ func newTransport() *http.Transport {
 // instance one that chooses the host per request.
 func NewHTTPClient(base http.RoundTripper) *http.Client {
 	if base == nil {
-		base = newTransport()
+		base = NewTransport()
 	}
 
 	return &http.Client{Transport: otelhttp.NewTransport(base)}

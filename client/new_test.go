@@ -56,7 +56,7 @@ func TestNewTransport(t *testing.T) {
 	t.Setenv(config.EnvKeepAliveTime, "4m")
 	t.Setenv(config.EnvKeepAliveTimeout, "5s")
 
-	transport := newTransport()
+	transport := NewTransport()
 
 	if !transport.Protocols.HTTP1() || !transport.Protocols.UnencryptedHTTP2() {
 		t.Errorf("protocols = %v, want HTTP/1.1 and cleartext HTTP/2", transport.Protocols)

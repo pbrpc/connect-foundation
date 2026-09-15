@@ -60,7 +60,7 @@ type readyTransport struct {
 // library's exponential schedule with its defaults.
 func NewReadyTransport(base http.RoundTripper, clock Clock, newBackOff NewBackOff) http.RoundTripper {
 	if base == nil {
-		base = newTransport()
+		base = NewTransport()
 	}
 
 	if clock == nil {
