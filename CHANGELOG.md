@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.1.1 - 2026-09-15
+#### Bug Fixes
+- default transport when none is passed in for the client - (fd9a8ff) - Nathan Blair
+
+- - -
+
 ## 0.1.0 - 2026-09-14
 #### Features
 - initial release - (54ca64c) - Nathan Blair
