@@ -22,7 +22,7 @@ func TestAddress(t *testing.T) {
 }
 
 func TestName(t *testing.T) {
-	fallback := "grpcd"
+	fallback := "host"
 
 	t.Run("returns the fallback when environment variable not set", func(t *testing.T) {
 		result := Name(fallback)
@@ -32,10 +32,10 @@ func TestName(t *testing.T) {
 	})
 
 	t.Run("returns environment variable when set", func(t *testing.T) {
-		t.Setenv(EnvServerName, "grpcd-canary")
+		t.Setenv(EnvServerName, "host-canary")
 		result := Name(fallback)
-		if result != "grpcd-canary" {
-			t.Errorf("expected %q, got %q", "grpcd-canary", result)
+		if result != "host-canary" {
+			t.Errorf("expected %q, got %q", "host-canary", result)
 		}
 	})
 }

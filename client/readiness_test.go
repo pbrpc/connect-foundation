@@ -90,7 +90,7 @@ func fixedSchedule(delays ...time.Duration) NewBackOff {
 }
 
 // newRequest builds a request to host under ctx for the stubs to see.
-func newRequest(t *testing.T, ctx context.Context, host string) *http.Request {
+func newRequest(ctx context.Context, t *testing.T, host string) *http.Request {
 	t.Helper()
 
 	request, err := http.NewRequestWithContext(ctx, http.MethodPost, "http://"+host+"/", nil)
@@ -157,13 +157,13 @@ func TestSystemClock(t *testing.T) {
 
 // attempt sends a request to host on its own goroutine and answers with the
 // channel its error arrives on.
-func attempt(t *testing.T, ctx context.Context, transport http.RoundTripper, host string) <-chan error {
+func attempt(ctx context.Context, t *testing.T, transport http.RoundTripper, host string) <-chan error {
 	t.Helper()
 
 	results := make(chan error, 1)
 
 	go func() {
-		_, err := transport.RoundTrip(newRequest(t, ctx, host))
+		_, err := transport.RoundTrip(newRequest(ctx, t, host))
 		results <- err
 	}()
 
@@ -171,14 +171,14 @@ func attempt(t *testing.T, ctx context.Context, transport http.RoundTripper, hos
 }
 
 func TestReadyTransport(t *testing.T) {
-	const grpcd, principal = "grpcd:50051", "principal:50051"
+	const h1, h2 = "h1:50051", "h2:50051"
 
 	t.Run("sends at once while the host is reachable", func(t *testing.T) {
 		base := newRoundTripperStub()
 		clock := newClockStub()
 		transport := NewReadyTransport(base, clock, fixedSchedule(time.Second))
 
-		response, err := transport.RoundTrip(newRequest(t, t.Context(), grpcd))
+		response, err := transport.RoundTrip(newRequest(t.Context(), t, h1))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
@@ -192,17 +192,17 @@ func TestReadyTransport(t *testing.T) {
 	})
 
 	t.Run("waits out the schedule after a failure and forgets the host on success", func(t *testing.T) {
-		base := newRoundTripperStub(grpcd)
+		base := newRoundTripperStub(h1)
 		clock := newClockStub()
 		transport := NewReadyTransport(base, clock, fixedSchedule(time.Second, 2*time.Second))
 
 		// First attempt fails; nothing was waited for.
-		if _, err := transport.RoundTrip(newRequest(t, t.Context(), grpcd)); !errors.Is(err, errUnreachable) {
+		if _, err := transport.RoundTrip(newRequest(t.Context(), t, h1)); !errors.Is(err, errUnreachable) {
 			t.Fatalf("error = %v, want %v", err, errUnreachable)
 		}
 
 		// Second attempt waits the first delay, then fails again.
-		results := attempt(t, t.Context(), transport, grpcd)
+		results := attempt(t.Context(), t, transport, h1)
 		clock.fire <- clock.now
 
 		if err := <-results; !errors.Is(err, errUnreachable) {
@@ -211,9 +211,9 @@ func TestReadyTransport(t *testing.T) {
 
 		// The host comes back. The third attempt waits the second delay and
 		// gets through.
-		delete(base.down, grpcd)
+		delete(base.down, h1)
 
-		results = attempt(t, t.Context(), transport, grpcd)
+		results = attempt(t.Context(), t, transport, h1)
 		clock.fire <- clock.now
 
 		if err := <-results; err != nil {
@@ -226,28 +226,28 @@ func TestReadyTransport(t *testing.T) {
 		}
 
 		// The success forgot the host: the next attempt does not wait.
-		if _, err := transport.RoundTrip(newRequest(t, t.Context(), grpcd)); err != nil {
+		if _, err := transport.RoundTrip(newRequest(t.Context(), t, h1)); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if len(clock.waited) != len(want) {
 			t.Errorf("waited %v, want no further wait", clock.waited)
 		}
-		if base.calls[grpcd] != 4 {
-			t.Errorf("base transport calls = %d, want 4", base.calls[grpcd])
+		if base.calls[h1] != 4 {
+			t.Errorf("base transport calls = %d, want 4", base.calls[h1])
 		}
 	})
 
 	t.Run("keeps hosts apart", func(t *testing.T) {
-		base := newRoundTripperStub(grpcd)
+		base := newRoundTripperStub(h1)
 		clock := newClockStub()
 		transport := NewReadyTransport(base, clock, fixedSchedule(time.Second))
 
-		if _, err := transport.RoundTrip(newRequest(t, t.Context(), grpcd)); !errors.Is(err, errUnreachable) {
+		if _, err := transport.RoundTrip(newRequest(t.Context(), t, h1)); !errors.Is(err, errUnreachable) {
 			t.Fatalf("error = %v, want %v", err, errUnreachable)
 		}
 
-		// grpcd is in backoff; principal is not held by it.
-		if _, err := transport.RoundTrip(newRequest(t, t.Context(), principal)); err != nil {
+		// h1 is in backoff; h2 is not held by it.
+		if _, err := transport.RoundTrip(newRequest(t.Context(), t, h2)); err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		if len(clock.waited) != 0 {
@@ -256,14 +256,14 @@ func TestReadyTransport(t *testing.T) {
 	})
 
 	t.Run("attempts at once when the schedule stops", func(t *testing.T) {
-		base := newRoundTripperStub(grpcd)
+		base := newRoundTripperStub(h1)
 		clock := newClockStub()
 		transport := NewReadyTransport(base, clock, fixedSchedule(backoff.Stop))
 
-		if _, err := transport.RoundTrip(newRequest(t, t.Context(), grpcd)); !errors.Is(err, errUnreachable) {
+		if _, err := transport.RoundTrip(newRequest(t.Context(), t, h1)); !errors.Is(err, errUnreachable) {
 			t.Fatalf("error = %v, want %v", err, errUnreachable)
 		}
-		if _, err := transport.RoundTrip(newRequest(t, t.Context(), grpcd)); !errors.Is(err, errUnreachable) {
+		if _, err := transport.RoundTrip(newRequest(t.Context(), t, h1)); !errors.Is(err, errUnreachable) {
 			t.Fatalf("error = %v, want %v", err, errUnreachable)
 		}
 		if len(clock.waited) != 0 {
@@ -272,17 +272,17 @@ func TestReadyTransport(t *testing.T) {
 	})
 
 	t.Run("gives up the wait when the request's context ends", func(t *testing.T) {
-		base := newRoundTripperStub(grpcd)
+		base := newRoundTripperStub(h1)
 		clock := newClockStub()
 		transport := NewReadyTransport(base, clock, fixedSchedule(time.Second))
 
-		if _, err := transport.RoundTrip(newRequest(t, t.Context(), grpcd)); !errors.Is(err, errUnreachable) {
+		if _, err := transport.RoundTrip(newRequest(t.Context(), t, h1)); !errors.Is(err, errUnreachable) {
 			t.Fatalf("error = %v, want %v", err, errUnreachable)
 		}
 
 		ctx, cancel := context.WithCancel(t.Context())
 
-		results := attempt(t, ctx, transport, grpcd)
+		results := attempt(ctx, t, transport, h1)
 
 		// The wait is in progress once the clock has been asked; cancelling
 		// then is what ends it.
@@ -297,8 +297,8 @@ func TestReadyTransport(t *testing.T) {
 		if err := <-results; !errors.Is(err, context.Canceled) {
 			t.Fatalf("error = %v, want %v", err, context.Canceled)
 		}
-		if base.calls[grpcd] != 1 {
-			t.Errorf("base transport calls = %d, want the cancelled request not sent", base.calls[grpcd])
+		if base.calls[h1] != 1 {
+			t.Errorf("base transport calls = %d, want the cancelled request not sent", base.calls[h1])
 		}
 	})
 }
