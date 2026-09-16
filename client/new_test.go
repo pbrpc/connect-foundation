@@ -12,7 +12,7 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
-	"git.sonicoriginal.software/grpc-foundation/config"
+	"github.com/pbrpc/connect-foundation/config"
 )
 
 const procedure = "/example.ExampleService/Echo"

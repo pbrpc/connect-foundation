@@ -6,13 +6,13 @@ import (
 	"fmt"
 	"os"
 
-	"git.sonicoriginal.software/grpc-foundation/lifecycle"
-
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	"github.com/pbrpc/connect-foundation/lifecycle"
 )
 
 const envVar = "OTEL_TRACES_EXPORTER"

@@ -4,7 +4,7 @@ package server
 import (
 	"time"
 
-	"git.sonicoriginal.software/grpc-foundation/config"
+	"github.com/pbrpc/connect-foundation/config"
 )
 
 // Default server settings.

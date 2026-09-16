@@ -7,14 +7,13 @@ import (
 	"log/slog"
 	"slices"
 
-	"git.sonicoriginal.software/grpc-foundation/lifecycle"
+	"go.opentelemetry.io/otel/sdk/resource"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 
+	"github.com/pbrpc/connect-foundation/lifecycle"
 	"github.com/pbrpc/connect-foundation/otel/logging"
 	"github.com/pbrpc/connect-foundation/otel/metrics"
 	"github.com/pbrpc/connect-foundation/otel/tracing"
-
-	"go.opentelemetry.io/otel/sdk/resource"
-	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 )
 
 // Init initializes all OpenTelemetry providers: logging first (so tracing and

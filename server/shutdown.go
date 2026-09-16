@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"git.sonicoriginal.software/grpc-foundation/lifecycle"
+	"github.com/pbrpc/connect-foundation/lifecycle"
 )
 
 // Shutdowner stops a server once its in-flight requests finish, or once ctx

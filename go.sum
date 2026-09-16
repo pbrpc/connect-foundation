@@ -1,7 +1,5 @@
 connectrpc.com/connect/v2 v2.0.0-alpha.1 h1:T0Fk30RdHUG8Z8K5/ezkhGclsuoPoNp7ekK/YWjuB9Q=
 connectrpc.com/connect/v2 v2.0.0-alpha.1/go.mod h1:h651FA//hXdrOxDQ1Hiwte02sVqSPt+XY1Mj0kpLToI=
-git.sonicoriginal.software/grpc-foundation v0.11.0 h1:kvYAgl3YNv/MD/ODE7YpzCxeRgL8URAmiJwqiRTaVds=
-git.sonicoriginal.software/grpc-foundation v0.11.0/go.mod h1:7s6DosZ7LyjILuapMcwHfz/V3+uy3m0S99StULqm778=
 git.sonicoriginal.software/grpc-testing v0.2.0 h1:DwiOcdQ1VgM0Ertagm6agfL4cXI+a3TQtg5Er4aSvVE=
 git.sonicoriginal.software/grpc-testing v0.2.0/go.mod h1:3lCO2YmC5T1iNhL5aM2BmknDlvbDNuIraD5bROmLqxM=
 git.sonicoriginal.software/logger v0.1.0 h1:jt5ON2sA9pAqvv30roHDkZ96qg+1IPzPHccyhXDZyMY=

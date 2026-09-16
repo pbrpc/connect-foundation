@@ -9,8 +9,8 @@ import (
 
 	"connectrpc.com/connect/v2"
 
-	"git.sonicoriginal.software/grpc-foundation/config"
 	"git.sonicoriginal.software/logger"
+	"github.com/pbrpc/connect-foundation/config"
 )
 
 func TestNew(t *testing.T) {

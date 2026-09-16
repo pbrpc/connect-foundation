@@ -9,18 +9,18 @@ import (
 	"os"
 	"strings"
 
-	"git.sonicoriginal.software/grpc-foundation/lifecycle"
-	"git.sonicoriginal.software/logger/handlers/flat"
-	"git.sonicoriginal.software/logger/handlers/json"
-	"git.sonicoriginal.software/logger/handlers/structured"
-	"git.sonicoriginal.software/logger/handlers/tee"
-
 	"go.opentelemetry.io/contrib/bridges/otelslog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp"
 	"go.opentelemetry.io/otel/log/global"
 	sdklog "go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/resource"
+
+	"git.sonicoriginal.software/logger/handlers/flat"
+	"git.sonicoriginal.software/logger/handlers/json"
+	"git.sonicoriginal.software/logger/handlers/structured"
+	"git.sonicoriginal.software/logger/handlers/tee"
+	"github.com/pbrpc/connect-foundation/lifecycle"
 )
 
 const envVar = "OTEL_LOGS_EXPORTER"

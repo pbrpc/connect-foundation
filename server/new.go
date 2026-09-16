@@ -9,8 +9,8 @@ import (
 	"connectrpc.com/connect/v2"
 	"connectrpc.com/connect/v2/connecthttp"
 
-	"git.sonicoriginal.software/grpc-foundation/config"
 	"git.sonicoriginal.software/logger"
+	"github.com/pbrpc/connect-foundation/config"
 )
 
 // Middleware wraps the handler mounted for one route. pattern is the route as

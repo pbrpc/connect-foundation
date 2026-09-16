@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"git.sonicoriginal.software/grpc-foundation/lifecycle"
+	"github.com/pbrpc/connect-foundation/lifecycle"
 )
 
 // disableExporters turns every exporter off, so a test that wants one on sets

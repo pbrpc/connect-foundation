@@ -4,7 +4,6 @@ go 1.27.1
 
 require (
 	connectrpc.com/connect/v2 v2.0.0-alpha.1
-	git.sonicoriginal.software/grpc-foundation v0.11.0
 	git.sonicoriginal.software/grpc-testing v0.2.0
 	git.sonicoriginal.software/logger v0.1.0
 	github.com/cenkalti/backoff/v7 v7.0.0

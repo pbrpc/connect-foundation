@@ -8,7 +8,7 @@ import (
 	"connectrpc.com/connect/v2/connecthttp"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 
-	"git.sonicoriginal.software/grpc-foundation/config"
+	"github.com/pbrpc/connect-foundation/config"
 )
 
 // BaseURL answers with the URL a Connect client is built against for a
