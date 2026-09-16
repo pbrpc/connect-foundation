@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.3.0 - 2026-09-16
+#### Features
+- connect-foundation now owns config and lifecycle - (3136edf) - Nathan Blair
+
+- - -
+
 ## 0.2.1 - 2026-09-16
 #### Bug Fixes
 - use http2 - (e92f98a) - Nathan Blair
