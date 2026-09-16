@@ -4,6 +4,8 @@ import (
 	"crypto/tls"
 	"errors"
 	"testing"
+
+	"github.com/pbrpc/connect-testing/mocks/certificate"
 )
 
 func TestTLSConfig(t *testing.T) {
@@ -18,7 +20,7 @@ func TestTLSConfig(t *testing.T) {
 	})
 
 	t.Run("loads the certificate and key", func(t *testing.T) {
-		certPEM, keyPEM := selfSignedPEM(t)
+		certPEM, keyPEM := certificate.PEM(t)
 		t.Setenv(EnvTLSCert, certPEM)
 		t.Setenv(EnvTLSKey, keyPEM)
 
@@ -38,7 +40,7 @@ func TestTLSConfig(t *testing.T) {
 	})
 
 	t.Run("requires a client certificate when a CA is set", func(t *testing.T) {
-		certPEM, keyPEM := selfSignedPEM(t)
+		certPEM, keyPEM := certificate.PEM(t)
 		t.Setenv(EnvTLSCert, certPEM)
 		t.Setenv(EnvTLSKey, keyPEM)
 		// Any certificate serves as the CA: the pool holds it, the handshake
@@ -58,7 +60,7 @@ func TestTLSConfig(t *testing.T) {
 	})
 
 	t.Run("fails on a key without a certificate", func(t *testing.T) {
-		_, keyPEM := selfSignedPEM(t)
+		_, keyPEM := certificate.PEM(t)
 		t.Setenv(EnvTLSKey, keyPEM)
 
 		if _, err := TLSConfig(); err == nil {
@@ -67,7 +69,7 @@ func TestTLSConfig(t *testing.T) {
 	})
 
 	t.Run("fails on a CA that holds no certificate", func(t *testing.T) {
-		certPEM, keyPEM := selfSignedPEM(t)
+		certPEM, keyPEM := certificate.PEM(t)
 		t.Setenv(EnvTLSCert, certPEM)
 		t.Setenv(EnvTLSKey, keyPEM)
 		t.Setenv(EnvTLSClientCA, "not pem")

@@ -15,7 +15,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 
-	"git.sonicoriginal.software/grpc-testing/mocks/listener"
+	"github.com/pbrpc/connect-testing/mocks/certificate"
+	"github.com/pbrpc/connect-testing/mocks/listener"
 )
 
 // recordSpans installs an in-memory tracer provider as the global one for the
@@ -192,11 +193,11 @@ func TestServe(t *testing.T) {
 
 	t.Run("terminates TLS on the listener when configured", func(t *testing.T) {
 		srv := New(slog.New(slog.DiscardHandler), WithTLS(&tls.Config{
-			Certificates: []tls.Certificate{selfSigned(t)},
+			Certificates: []tls.Certificate{certificate.SelfSigned(t)},
 		}))
 		srv.RPC.Register(echoMethod(nil))
 
-		lis, client := newPipeListener()
+		lis, client := listener.NewPipe()
 
 		served := make(chan error, 1)
 		go func() { served <- srv.Serve(lis) }()

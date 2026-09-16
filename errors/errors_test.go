@@ -12,7 +12,7 @@ import (
 	"google.golang.org/genproto/googleapis/rpc/errdetails"
 	"google.golang.org/protobuf/proto"
 
-	"git.sonicoriginal.software/grpc-testing/mocks/tracer"
+	"github.com/pbrpc/connect-testing/mocks/tracer"
 )
 
 // connectError fails the test unless err is a *connect.Error carrying code.

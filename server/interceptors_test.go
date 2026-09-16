@@ -15,7 +15,7 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"go.opentelemetry.io/otel/trace"
 
-	"git.sonicoriginal.software/grpc-testing/mocks/tracer"
+	"github.com/pbrpc/connect-testing/mocks/tracer"
 	"git.sonicoriginal.software/logger"
 )
 

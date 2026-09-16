@@ -1,7 +1,5 @@
 connectrpc.com/connect/v2 v2.0.0-alpha.1 h1:T0Fk30RdHUG8Z8K5/ezkhGclsuoPoNp7ekK/YWjuB9Q=
 connectrpc.com/connect/v2 v2.0.0-alpha.1/go.mod h1:h651FA//hXdrOxDQ1Hiwte02sVqSPt+XY1Mj0kpLToI=
-git.sonicoriginal.software/grpc-testing v0.2.0 h1:DwiOcdQ1VgM0Ertagm6agfL4cXI+a3TQtg5Er4aSvVE=
-git.sonicoriginal.software/grpc-testing v0.2.0/go.mod h1:3lCO2YmC5T1iNhL5aM2BmknDlvbDNuIraD5bROmLqxM=
 git.sonicoriginal.software/logger v0.1.0 h1:jt5ON2sA9pAqvv30roHDkZ96qg+1IPzPHccyhXDZyMY=
 git.sonicoriginal.software/logger v0.1.0/go.mod h1:EYgVf52UTBSSmcIWMvWepjjccz9WPH24PcVlVY8SkGU=
 github.com/cenkalti/backoff/v5 v5.0.3 h1:ZN+IMa753KfX5hd8vVaMixjnqRZ3y8CuJKRKj1xcsSM=
@@ -25,6 +23,8 @@ github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0 h1:/Tnpcb2E0Pz/tN9s3bfEY2Q8ePCEX9iuS+cneUwncnw=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.30.0/go.mod h1:zOBXOsUaBSjKgmH4OGzV1esUpR3oUSCPYVd2cUBjKYY=
+github.com/pbrpc/connect-testing v0.3.0 h1:lYS7UU9gL2AjXfj2LIpnJMYjG5wbZOawSFuMN4WIQlY=
+github.com/pbrpc/connect-testing v0.3.0/go.mod h1:bujCENzxoogpSgKh//RLG0f5nWTQpiT4GrheaFYJ340=
 github.com/stretchr/testify v1.12.1 h1:EuwCh5fleGS7H32xRwO3wRGT7DxrDhLAT6FF8MpWDWE=
 github.com/stretchr/testify v1.12.1/go.mod h1:MDEgiDPPsNp5cuIrHPPCyornHKgEVbtFUmoNlxoYthg=
 go.opentelemetry.io/auto/sdk v1.2.1 h1:jXsnJ4Lmnqd11kwkBV2LgLoFMZKizbCi5fNZ/ipaZ64=
