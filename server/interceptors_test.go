@@ -15,8 +15,8 @@ import (
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/pbrpc/connect-testing/mocks/tracer"
 	"git.sonicoriginal.software/logger"
+	"github.com/pbrpc/connect-testing/mocks/tracer"
 )
 
 // Any non-zero pair makes a span context valid, which is all withTrace asks of
