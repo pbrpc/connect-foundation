@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.2.1 - 2026-09-16
+#### Bug Fixes
+- use http2 - (e92f98a) - Nathan Blair
+
+- - -
+
 ## 0.2.0 - 2026-09-15
 #### Features
 - add TLS termination - (2a17539) - Nathan Blair
