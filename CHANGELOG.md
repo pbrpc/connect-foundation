@@ -2,6 +2,14 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.5.0 - 2026-09-16
+#### Features
+- leverage standard library better for mux and routing - (617e7be) - Nathan Blair
+#### Miscellaneous Chores
+- import ordering - (3e9282b) - Nathan Blair
+
+- - -
+
 ## 0.4.0 - 2026-09-16
 #### Features
 - use the new connect-testing - (397886a) - Nathan Blair
