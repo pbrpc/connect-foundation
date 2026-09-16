@@ -10,11 +10,10 @@ import (
 )
 
 // procedure names the one method every test registers. Its service segment is
-// what the span interceptor reports; its catch-all is what Mount adds beside it.
+// what the span interceptor reports.
 const (
 	serviceName = "example.ExampleService"
 	procedure   = "/" + serviceName + "/Echo"
-	serviceRoot = "/" + serviceName + "/"
 )
 
 // echoSpec describes procedure as a unary RPC over StringValue messages. The

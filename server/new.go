@@ -45,11 +45,12 @@ func WithTransportOptions(transport ...connecthttp.Option) Option {
 	}
 }
 
-// WithRouteMiddleware wraps every procedure route Mount registers. The first
-// middleware given is the outermost. This is where a server bounds the
-// lifetime of one route's stream, by setting a write deadline on the response
-// before handing it on; nothing in the HTTP layer names such a setting, so
-// the foundation offers none.
+// WithRouteMiddleware wraps every route on Mux, the procedures Mount
+// registers and the plain routes a caller adds, each with the pattern it
+// matched. The first middleware given is the outermost. This is where a
+// server bounds the lifetime of one route's stream, by setting a write
+// deadline on the response before handing it on; nothing in the HTTP layer
+// names such a setting, so the foundation offers none.
 func WithRouteMiddleware(middleware ...Middleware) Option {
 	return func(o *options) {
 		o.middleware = append(o.middleware, middleware...)
@@ -75,15 +76,16 @@ type Server struct {
 	RPC *connect.Server
 
 	// Mux carries every route. Mount adds one per procedure; a caller adds
-	// plain HTTP routes of its own beside them.
+	// plain HTTP routes of its own beside them with Mux.Handle, and every
+	// route is served the same way: under an HTTP span named by the pattern
+	// it matched, through the route middleware.
 	Mux *http.ServeMux
 
-	// HTTP is the server that listens. Its handler is Mux.
+	// HTTP is the server that listens. Its handler serves Mux.
 	HTTP *http.Server
 
-	transport  []connecthttp.Option
-	middleware []Middleware
-	mounted    sync.Once
+	transport []connecthttp.Option
+	mounted   sync.Once
 }
 
 // New creates a Connect server with production-grade defaults.
@@ -131,7 +133,7 @@ func New(log *slog.Logger, opts ...Option) *Server {
 		RPC: connect.NewServer(interceptors...),
 		Mux: mux,
 		HTTP: &http.Server{
-			Handler:     mux,
+			Handler:     handler(mux, o.middleware),
 			IdleTimeout: config.DurationOrDefault(EnvMaxConnectionIdle, DefaultMaxConnectionIdle),
 			Protocols:   protocols,
 			TLSConfig:   o.tls,
@@ -140,7 +142,6 @@ func New(log *slog.Logger, opts ...Option) *Server {
 				PingTimeout:     config.KeepAliveTimeout(),
 			},
 		},
-		transport:  transport,
-		middleware: o.middleware,
+		transport: transport,
 	}
 }

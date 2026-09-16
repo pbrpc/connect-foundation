@@ -39,13 +39,19 @@ func recordSpans(t *testing.T) *tracetest.InMemoryExporter {
 }
 
 // echo sends text to procedure over the Connect protocol as JSON, through the
-// mux and nothing else, and answers with the recorded response.
+// handler HTTP serves and nothing else, and answers with the recorded
+// response.
 func echo(srv *Server, text string) *httptest.ResponseRecorder {
-	request := httptest.NewRequest(http.MethodPost, procedure, strings.NewReader(`"`+text+`"`))
+	return serve(srv, httptest.NewRequest(http.MethodPost, procedure, strings.NewReader(`"`+text+`"`)))
+}
+
+// serve puts request through the handler HTTP serves and answers with the
+// recorded response.
+func serve(srv *Server, request *http.Request) *httptest.ResponseRecorder {
 	request.Header.Set("Content-Type", "application/json")
 
 	recorder := httptest.NewRecorder()
-	srv.Mux.ServeHTTP(recorder, request)
+	srv.HTTP.Handler.ServeHTTP(recorder, request)
 
 	return recorder
 }
@@ -106,7 +112,7 @@ func TestMount(t *testing.T) {
 		}
 	})
 
-	t.Run("wraps every route in the middleware, first outermost", func(t *testing.T) {
+	t.Run("wraps every route in the middleware, first outermost, with the pattern it matched", func(t *testing.T) {
 		var patterns []string
 
 		record := func(name string) Middleware {
@@ -124,15 +130,6 @@ func TestMount(t *testing.T) {
 		srv.RPC.Register(echoMethod(nil))
 		srv.Mount()
 
-		for _, want := range []string{
-			"outer:" + procedure, "inner:" + procedure,
-			"outer:" + serviceRoot, "inner:" + serviceRoot,
-		} {
-			if !slices.Contains(patterns, want) {
-				t.Errorf("patterns = %v, want %q", patterns, want)
-			}
-		}
-
 		recorder := echo(srv, "hello")
 
 		if recorder.Code != http.StatusOK {
@@ -140,6 +137,50 @@ func TestMount(t *testing.T) {
 		}
 		if got := recorder.Header().Values("X-Order"); !slices.Equal(got, []string{"outer", "inner"}) {
 			t.Errorf("order = %v, want outer then inner", got)
+		}
+		// Wrapping runs innermost first, so the record reads inner then outer;
+		// both saw the matched procedure.
+		if want := []string{"inner:" + procedure, "outer:" + procedure}; !slices.Equal(patterns, want) {
+			t.Errorf("patterns = %v, want %v", patterns, want)
+		}
+	})
+
+	t.Run("serves a plain route on the mux the same way as a procedure", func(t *testing.T) {
+		exporter := recordSpans(t)
+
+		var patterns []string
+
+		record := func(pattern string, next http.Handler) http.Handler {
+			patterns = append(patterns, pattern)
+
+			return next
+		}
+
+		srv := New(slog.New(slog.DiscardHandler), WithRouteMiddleware(record))
+		srv.Mux.Handle("/healthz", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(http.StatusNoContent)
+		}))
+
+		recorder := serve(srv, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+
+		if recorder.Code != http.StatusNoContent {
+			t.Fatalf("status = %d, want the route's own answer", recorder.Code)
+		}
+		if !slices.Equal(patterns, []string{"/healthz"}) {
+			t.Errorf("patterns = %v, want the plain route wrapped with its pattern", patterns)
+		}
+
+		spans := exporter.GetSpans()
+		if len(spans) != 1 || spans[0].Name != http.MethodGet+" /healthz" {
+			t.Errorf("spans = %v, want one named by method and route", spans)
+		}
+	})
+
+	t.Run("answers an unknown route the way the mux does", func(t *testing.T) {
+		srv := New(slog.New(slog.DiscardHandler))
+
+		if recorder := serve(srv, httptest.NewRequest(http.MethodGet, "/nowhere", nil)); recorder.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want 404", recorder.Code)
 		}
 	})
 

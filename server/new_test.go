@@ -17,11 +17,8 @@ func TestNew(t *testing.T) {
 	t.Run("builds the three parts", func(t *testing.T) {
 		srv := New(slog.New(slog.DiscardHandler))
 
-		if srv.RPC == nil || srv.Mux == nil || srv.HTTP == nil {
+		if srv.RPC == nil || srv.Mux == nil || srv.HTTP == nil || srv.HTTP.Handler == nil {
 			t.Fatalf("server = %+v, want every part built", srv)
-		}
-		if srv.HTTP.Handler != srv.Mux {
-			t.Error("the HTTP server does not serve the mux")
 		}
 		if !srv.HTTP.Protocols.HTTP1() || !srv.HTTP.Protocols.UnencryptedHTTP2() {
 			t.Errorf("protocols = %v, want HTTP/1.1 and cleartext HTTP/2", srv.HTTP.Protocols)

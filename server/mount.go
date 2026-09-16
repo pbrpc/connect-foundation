@@ -9,23 +9,37 @@ import (
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 )
 
-// routes is the mux connecthttp.Mount registers on. Each route it receives is
-// wrapped before reaching the real mux: the caller's middleware innermost, in
-// order, and the HTTP span outermost, named by HTTP method and route ("POST
-// /package.Service/Method"), so the span exists by the time anything else
-// runs.
-type routes struct {
-	mux        connecthttp.ServeMux
+// dispatcher is what the HTTP server serves: the mux, with every route it
+// resolves wrapped in the caller's middleware, innermost last, before the
+// handler runs. It is one handler over the whole mux, so a route registered
+// any way at all is covered.
+type dispatcher struct {
+	mux        *http.ServeMux
 	middleware []Middleware
 }
 
-// Handle wraps handler and registers it under pattern.
-func (r *routes) Handle(pattern string, handler http.Handler) {
-	for _, wrap := range slices.Backward(r.middleware) {
-		handler = wrap(pattern, handler)
+// ServeHTTP asks the mux which route it will serve, wraps the mux in the
+// middleware with that pattern, and serves through it, so the mux still does
+// its own dispatch and the request carries the pattern and path values it
+// sets. A request the mux has no route for gets the mux's own answer,
+// unwrapped.
+func (d *dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	var handler http.Handler = d.mux
+
+	if _, pattern := d.mux.Handler(r); pattern != "" {
+		for _, wrap := range slices.Backward(d.middleware) {
+			handler = wrap(pattern, handler)
+		}
 	}
 
-	r.mux.Handle(pattern, otelhttp.NewHandler(handler, pattern))
+	handler.ServeHTTP(w, r)
+}
+
+// handler answers with what HTTP serves: the dispatcher under one HTTP span
+// per request, named by method and the route the mux matched once it has, so
+// the span exists by the time any middleware or handler runs.
+func handler(mux *http.ServeMux, middleware []Middleware) http.Handler {
+	return otelhttp.NewHandler(&dispatcher{mux: mux, middleware: middleware}, "")
 }
 
 // Mount registers a route on Mux for every procedure registered on RPC. It
@@ -33,7 +47,7 @@ func (r *routes) Handle(pattern string, handler http.Handler) {
 // its own step after they are made. Calling it again does nothing.
 func (s *Server) Mount() {
 	s.mounted.Do(func() {
-		connecthttp.Mount(&routes{mux: s.Mux, middleware: s.middleware}, s.RPC, s.transport...)
+		connecthttp.Mount(s.Mux, s.RPC, s.transport...)
 	})
 }
 

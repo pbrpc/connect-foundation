@@ -30,9 +30,11 @@ than from a copy here.
 - **`server/`** — `New` builds the RPC dispatcher, the mux, and the HTTP server;
   `Serve` mounts every registered procedure and listens;
   `HandleGracefulShutdown` stops serving and flushes telemetry against one
-  deadline. `WithRouteMiddleware` wraps individual procedure routes, which is
-  where a server bounds one stream's lifetime by setting a write deadline on the
-  response. `WithTLS` terminates TLS on the listener with the `*tls.Config`
+  deadline. Every route on the mux, procedure or plain `Mux.Handle`, is served
+  under one HTTP span named by the pattern it matched, and
+  `WithRouteMiddleware` wraps each with that pattern, which is where a server
+  bounds one stream's lifetime by setting a write deadline on the response.
+  `WithTLS` terminates TLS on the listener with the `*tls.Config`
   given, serving HTTP/1.1 and HTTP/2 over it; `TLSConfig` builds that config
   from the environment, and answers nil, which `WithTLS` reads as cleartext,
   when none is set.
