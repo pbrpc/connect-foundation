@@ -43,13 +43,17 @@ than from a copy here.
   could not be reached until its backoff schedule allows the next attempt,
   per host, the way a gRPC connection paced its reconnects.
 - **`otel/`** — `Init` brings up logging, tracing, and metrics under one service
-  identity, exporting over OTLP/HTTP.
+  identity, exporting over OTLP/HTTP. The logger it builds is the process
+  default, and every line logged with a request's context carries that
+  request's `trace_id` and `span_id`, on the exported record and on the stdout
+  copy alike, so a span in the trace store leads to its lines in the log store
+  and back.
 - **`errors/`** — constructors for Connect errors carrying `google.rpc` details,
   each recording a span event.
 
-Server configuration and keepalive settings are read through
-`grpc-foundation/config`, so a service moving from the gRPC foundation keeps its
-environment.
+Server configuration and keepalive settings are read by `config/`, under the
+same variable names the gRPC foundation used, so a service moving from it keeps
+its environment.
 
 ## Configuration
 

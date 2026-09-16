@@ -14,6 +14,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/pbrpc/connect-testing/mocks/certificate"
 	"github.com/pbrpc/connect-testing/mocks/listener"
@@ -156,8 +157,14 @@ func TestMount(t *testing.T) {
 			return next
 		}
 
+		var seen trace.SpanContext
+
 		srv := New(slog.New(slog.DiscardHandler), WithRouteMiddleware(record))
-		srv.Mux.Handle("/healthz", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		srv.Mux.Handle("/healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// The span is in the route's context, which is where the process
+			// logger reads it from on every line logged with that context.
+			seen = trace.SpanContextFromContext(r.Context())
+
 			w.WriteHeader(http.StatusNoContent)
 		}))
 
@@ -172,7 +179,10 @@ func TestMount(t *testing.T) {
 
 		spans := exporter.GetSpans()
 		if len(spans) != 1 || spans[0].Name != http.MethodGet+" /healthz" {
-			t.Errorf("spans = %v, want one named by method and route", spans)
+			t.Fatalf("spans = %v, want one named by method and route", spans)
+		}
+		if seen.TraceID() != spans[0].SpanContext.TraceID() {
+			t.Errorf("handler saw trace %s, want the route's span %s", seen.TraceID(), spans[0].SpanContext.TraceID())
 		}
 	})
 

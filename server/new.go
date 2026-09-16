@@ -91,13 +91,18 @@ type Server struct {
 // New creates a Connect server with production-grade defaults.
 //
 // Standard interceptors, outermost first: the RPC's service and method on the
-// span the HTTP layer started, panic recovery answering Internal, and the
-// logger in every request context. Message-size limits come from
-// GRPC_MAX_RECV_MSG_SIZE and GRPC_MAX_SEND_MSG_SIZE. The HTTP server accepts
-// HTTP/1.1 and cleartext HTTP/2, or HTTP/1.1 and HTTP/2 over TLS when WithTLS
-// is given; it closes a connection idle for GRPC_MAX_CONNECTION_IDLE, and
-// pings one quiet for GRPC_KEEPALIVE_TIME, closing it when the ping goes
-// unanswered for GRPC_KEEPALIVE_TIMEOUT.
+// span the HTTP layer started, and panic recovery answering Internal, logged
+// to log. Message-size limits come from GRPC_MAX_RECV_MSG_SIZE and
+// GRPC_MAX_SEND_MSG_SIZE. The HTTP server accepts HTTP/1.1 and cleartext
+// HTTP/2, or HTTP/1.1 and HTTP/2 over TLS when WithTLS is given; it closes a
+// connection idle for GRPC_MAX_CONNECTION_IDLE, and pings one quiet for
+// GRPC_KEEPALIVE_TIME, closing it when the ping goes unanswered for
+// GRPC_KEEPALIVE_TIMEOUT.
+//
+// Every request runs under an HTTP span, and the process logger otel.Init
+// built prints that span's identifiers on every line logged with the
+// request's context, so a handler logs with logger.FromContext(ctx) and
+// nothing has to be put into the context for it.
 func New(log *slog.Logger, opts ...Option) *Server {
 	if log == nil {
 		log = logger.NewNullLogger()
@@ -111,7 +116,6 @@ func New(log *slog.Logger, opts ...Option) *Server {
 	interceptors := append([]connect.ServerInterceptor{
 		makeSpanInterceptor(),
 		makeRecoveryInterceptor(log),
-		makeLoggerInterceptor(log),
 	}, o.interceptors...)
 
 	transport := append([]connecthttp.Option{

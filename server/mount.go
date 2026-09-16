@@ -37,7 +37,8 @@ func (d *dispatcher) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 // handler answers with what HTTP serves: the dispatcher under one HTTP span
 // per request, named by method and the route the mux matched once it has, so
-// the span exists by the time any middleware or handler runs.
+// the span is in every handler's context, which is where the logger finds
+// it.
 func handler(mux *http.ServeMux, middleware []Middleware) http.Handler {
 	return otelhttp.NewHandler(&dispatcher{mux: mux, middleware: middleware}, "")
 }

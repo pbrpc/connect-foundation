@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"errors"
-	"io"
 	"log/slog"
 	"strings"
 	"testing"
@@ -13,17 +12,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
-	"go.opentelemetry.io/otel/trace"
 
-	"git.sonicoriginal.software/logger"
 	"github.com/pbrpc/connect-testing/mocks/tracer"
-)
-
-// Any non-zero pair makes a span context valid, which is all withTrace asks of
-// one.
-var (
-	traceID = trace.TraceID{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}
-	spanID  = trace.SpanID{0x01, 0x02, 0x03, 0x04}
 )
 
 // handlerStub is the ServerFunc an interceptor wraps in these tests. It
@@ -43,49 +33,6 @@ func (h *handlerStub) serve(ctx context.Context, _ connect.Spec, _ connect.Serve
 	}
 
 	return h.err
-}
-
-func TestWithTrace(t *testing.T) {
-	t.Run("adds the trace identifiers when the context carries a span", func(t *testing.T) {
-		var out bytes.Buffer
-		log := slog.New(slog.NewTextHandler(&out, nil))
-
-		spanContext := trace.NewSpanContext(trace.SpanContextConfig{
-			TraceID: traceID,
-			SpanID:  spanID,
-		})
-
-		withTrace(trace.ContextWithSpanContext(t.Context(), spanContext), log).Info("message")
-
-		if !strings.Contains(out.String(), traceID.String()) {
-			t.Errorf("output = %q, want it to carry the trace ID", out.String())
-		}
-		if !strings.Contains(out.String(), spanID.String()) {
-			t.Errorf("output = %q, want it to carry the span ID", out.String())
-		}
-	})
-
-	t.Run("returns the logger unchanged when the context carries no span", func(t *testing.T) {
-		log := slog.New(slog.NewTextHandler(io.Discard, nil))
-
-		if withTrace(t.Context(), log) != log {
-			t.Error("expected the logger it was given")
-		}
-	})
-}
-
-func TestMakeLoggerInterceptor(t *testing.T) {
-	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	handler := &handlerStub{}
-
-	serve := makeLoggerInterceptor(log)(handler.serve)
-
-	if err := serve(t.Context(), echoSpec, serverStreamStub{}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if logger.FromContext(handler.ctx) != log {
-		t.Error("the handler did not receive the logger")
-	}
 }
 
 func TestMakeRecoveryInterceptor(t *testing.T) {

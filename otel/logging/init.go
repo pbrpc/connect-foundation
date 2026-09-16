@@ -101,10 +101,20 @@ func Init(
 		slog.New(stdoutHandler).With(serviceAttr).Error("otel sdk", "error", err)
 	}))
 
+	// otelslog stamps every exported record with its span on its own; the
+	// stdout copy gets the same two fields from the context here, so a line
+	// on either side leads to the span it was logged under.
 	handler := slog.Handler(otelHandler)
 	if format != "none" {
-		handler = tee.NewHandler(otelHandler, stdoutHandler)
+		handler = tee.NewHandler(otelHandler, withTrace(stdoutHandler))
 	}
 
-	return slog.New(handler).With(serviceAttr), shutdown, nil
+	log := slog.New(handler).With(serviceAttr)
+
+	// The process logger is what any code reaching for a logger without one in
+	// hand gets, logger.FromContext on a context nothing put a logger into
+	// included.
+	slog.SetDefault(log)
+
+	return log, shutdown, nil
 }

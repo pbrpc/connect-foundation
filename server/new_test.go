@@ -9,7 +9,6 @@ import (
 
 	"connectrpc.com/connect/v2"
 
-	"git.sonicoriginal.software/logger"
 	"github.com/pbrpc/connect-foundation/config"
 )
 
@@ -90,13 +89,13 @@ func TestNew(t *testing.T) {
 
 	t.Run("runs the caller's interceptors after the standard ones", func(t *testing.T) {
 		called := false
-		observe := func(next connect.ServerFunc) connect.ServerFunc {
-			return func(ctx context.Context, spec connect.Spec, stream connect.ServerStream) error {
-				// The logger interceptor has already run by the time a caller's
-				// interceptor does, so the context carries it here.
-				called = logger.FromContext(ctx) != nil
+		observe := func(connect.ServerFunc) connect.ServerFunc {
+			return func(context.Context, connect.Spec, connect.ServerStream) error {
+				called = true
 
-				return next(ctx, spec, stream)
+				// Inside the standard recovery, so this is answered as Internal
+				// rather than taking the call down.
+				panic("interceptor failure")
 			}
 		}
 
@@ -104,12 +103,9 @@ func TestNew(t *testing.T) {
 
 		srv.RPC.Register(echoMethod(nil))
 
-		got, err := callEcho(t, srv.RPC, "hello")
-		if err != nil {
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if got != "hello" {
-			t.Errorf("response = %q, want hello", got)
+		_, err := callEcho(t, srv.RPC, "hello")
+		if connect.CodeOf(err) != connect.CodeInternal {
+			t.Fatalf("error = %v, want the recovered Internal", err)
 		}
 		if !called {
 			t.Error("the caller's interceptor did not run")
