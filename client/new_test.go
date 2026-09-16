@@ -58,8 +58,10 @@ func TestNewTransport(t *testing.T) {
 
 	transport := NewTransport()
 
-	if !transport.Protocols.HTTP1() || !transport.Protocols.UnencryptedHTTP2() {
-		t.Errorf("protocols = %v, want HTTP/1.1 and cleartext HTTP/2", transport.Protocols)
+	// Cleartext HTTP/2 is used for http:// URLs only when HTTP/1 is not also
+	// enabled; with both, net/http speaks HTTP/1.1 and gRPC cannot pass.
+	if transport.Protocols.HTTP1() || !transport.Protocols.UnencryptedHTTP2() {
+		t.Errorf("protocols = %v, want cleartext HTTP/2 alone", transport.Protocols)
 	}
 	if transport.HTTP2.SendPingTimeout != 4*time.Minute {
 		t.Errorf("send ping timeout = %v, want 4m", transport.HTTP2.SendPingTimeout)

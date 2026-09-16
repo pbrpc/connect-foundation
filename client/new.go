@@ -24,9 +24,12 @@ func BaseURL(address string) string {
 // went silent is noticed on a held connection and not only on the next call.
 // It is what NewHTTPClient and NewReadyTransport use when given no base, and
 // what a caller wraps when it puts its own RoundTripper under them.
+//
+// HTTP/2 is the only protocol enabled: net/http speaks unencrypted HTTP/2 to
+// an http:// URL only when HTTP/1 is not also enabled, and gRPC and the
+// streaming RPCs need HTTP/2. Every server on the mesh accepts it.
 func NewTransport() *http.Transport {
 	protocols := new(http.Protocols)
-	protocols.SetHTTP1(true)
 	protocols.SetUnencryptedHTTP2(true)
 
 	return &http.Transport{
