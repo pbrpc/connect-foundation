@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.4.0 - 2026-09-16
+#### Features
+- use the new connect-testing - (397886a) - Nathan Blair
+
+- - -
+
 ## 0.3.0 - 2026-09-16
 #### Features
 - connect-foundation now owns config and lifecycle - (3136edf) - Nathan Blair
