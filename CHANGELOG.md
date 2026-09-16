@@ -2,6 +2,12 @@
 All notable changes to this project will be documented in this file. See [conventional commits](https://www.conventionalcommits.org/) for commit guidelines.
 
 - - -
+## 0.6.0 - 2026-09-16
+#### Features
+- more otel integration in logging - (066ab2b) - Nathan Blair
+
+- - -
+
 ## 0.5.0 - 2026-09-16
 #### Features
 - leverage standard library better for mux and routing - (617e7be) - Nathan Blair
