@@ -1,3 +1,5 @@
+Archived: See remaining ecosystem for decomposed replacements
+
 # connect-foundation
 
 A Connect service needs the same things settled before it answers its first
@@ -31,23 +33,21 @@ than from a copy here.
   `Serve` mounts every registered procedure and listens;
   `HandleGracefulShutdown` stops serving and flushes telemetry against one
   deadline. Every route on the mux, procedure or plain `Mux.Handle`, is served
-  under one HTTP span named by the pattern it matched, and
-  `WithRouteMiddleware` wraps each with that pattern, which is where a server
-  bounds one stream's lifetime by setting a write deadline on the response.
-  `WithTLS` terminates TLS on the listener with the `*tls.Config`
-  given, serving HTTP/1.1 and HTTP/2 over it; `TLSConfig` builds that config
-  from the environment, and answers nil, which `WithTLS` reads as cleartext,
-  when none is set.
+  under one HTTP span named by the pattern it matched, and `WithRouteMiddleware`
+  wraps each with that pattern, which is where a server bounds one stream's
+  lifetime by setting a write deadline on the response. `WithTLS` terminates TLS
+  on the listener with the `*tls.Config` given, serving HTTP/1.1 and HTTP/2 over
+  it; `TLSConfig` builds that config from the environment, and answers nil,
+  which `WithTLS` reads as cleartext, when none is set.
 - **`client/`** — `NewHTTPClient` and `New` build a `*connect.Client` with
-  tracing and keepalive; `NewReadyTransport` holds requests to a host that
-  could not be reached until its backoff schedule allows the next attempt,
-  per host, the way a gRPC connection paced its reconnects.
+  tracing and keepalive; `NewReadyTransport` holds requests to a host that could
+  not be reached until its backoff schedule allows the next attempt, per host,
+  the way a gRPC connection paced its reconnects.
 - **`otel/`** — `Init` brings up logging, tracing, and metrics under one service
   identity, exporting over OTLP/HTTP. The logger it builds is the process
-  default, and every line logged with a request's context carries that
-  request's `trace_id` and `span_id`, on the exported record and on the stdout
-  copy alike, so a span in the trace store leads to its lines in the log store
-  and back.
+  default, and every line logged with a request's context carries that request's
+  `trace_id` and `span_id`, on the exported record and on the stdout copy alike,
+  so a span in the trace store leads to its lines in the log store and back.
 - **`errors/`** — constructors for Connect errors carrying `google.rpc` details,
   each recording a span event.
 
